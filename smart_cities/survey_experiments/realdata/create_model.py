@@ -5,8 +5,8 @@ import write_data
 import networkx as nx
 
 INCREASE_LENGTH = 10
-EPSILON_LENGTH =  1
-DECREASE_SPEED = 0.3
+EPSILON_LENGTH = 1
+DECREASE_SPEED = 0.1
 model = AbstractModel()
 model.nodes =    Set()
 model.route_no = Set()
@@ -35,14 +35,16 @@ for edge in model.graph.edges():
 
 model.Routes = {}
 #read routes from file
-myFile = open("temp_files/routes.txt", "r")
-count = 1
-for line in myFile:
-  lines_split = line.split()
-  route = [int(r) for r in lines_split]
-  model.Routes[count] = route
-  count += 1
-myFile.close()
+def get_routes(seed):
+    routefile = "temp_files/routes_" + str(seed) + '.txt'
+    myFile = open(routefile, "r")
+    count = 1
+    for line in myFile:
+        lines_split = line.split()
+        route = [int(r) for r in lines_split]
+        model.Routes[count] = route
+        count += 1
+    myFile.close()
 
 
 #functions to change soc resolution 
@@ -369,47 +371,34 @@ def install_lower(model, roadSeg):
 model.installL = Constraint(model.roadSegs, rule=install_lower)
 
 
-      
-       
 #budget
 def budget(model):
-      
     out = 0
     for r in model.roadSegs:
       out += model.costInstall[r]*model.roadInstall[r]
-      
     constraint_equation = (out <= model.budget.value)
-    
-    return constraint_equation
-    
+    return constraint_equation   
 model.budgetLimit = Constraint(rule=budget)
     
     
 def totalRule(model):
-
   output = 0
-
   for (r,i,j) in model.arcs:
     output += model.weight[r,i,j]*model.x[r,i,j]
-    
   return output
 
 #model.maxFlow = Objective(rule=totalRule, sense=maximize)    
 
 def minBudget(model):
-
   output = 0
-  
   for roadSeg in model.roadSegs:
     output += model.costInstall[roadSeg]*model.roadInstall[roadSeg]
-
   return output
 
 #model.minBudget = Objective(rule=minBudget, sense=minimize) 
 
 def maxSOC(model):
   output = 0
-  
   for route_no,node in model.boundary_nodes:
     output += model.boundary_node_weights[route_no, node]*model.x[route_no, node, 'destination']
   return output

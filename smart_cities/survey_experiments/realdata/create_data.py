@@ -14,9 +14,10 @@ import collections
 import random
 import copy
 
+curr_dir = '/home/hushiji/Research/smart_cities/smart_cities/survey_experiments/realdata/'
 INCREASE_LENGTH = 10
 EPSILON_LENGTH =  1
-DECREASE_SPEED = 0.3
+DECREASE_SPEED = 0.1
 
 #functions to change soc resolution
 def standard_soc_to_range_soc(standard_soc, soc_lower_bound):
@@ -88,7 +89,7 @@ def path_to_layeredGraph(graph, path, pathNumber, data, data_var, nLayers):
         #INSTALL = True
         INSTALL = True
         velocity = graph.node[str(roadSeg - 2)]['speed_urban']*DECREASE_SPEED
-        distance = graph.node[str(roadSeg - 2)]['length']*0.00621371*INCREASE_LENGTH
+        distance = graph.node[str(roadSeg - 2)]['length']*0.00621371*INCREASE_LENGTH + EPSILON_LENGTH
         current_range_soc = standard_soc_to_range_soc(current_standard_soc, soc_lower_bound)
         next_range_soc = write_data.nextSOC_real_data(current_range_soc, distance, 1, velocity, INSTALL)
         next_standard_soc = range_soc_to_standard_soc(next_range_soc, nLayers, soc_lower_bound)     
@@ -100,7 +101,7 @@ def path_to_layeredGraph(graph, path, pathNumber, data, data_var, nLayers):
         #INSTALL = False
         INSTALL = False
         velocity = graph.node[str(roadSeg - 2)]['speed_urban']*DECREASE_SPEED
-        distance = graph.node[str(roadSeg - 2)]['length']*0.00621371*INCREASE_LENGTH
+        distance = graph.node[str(roadSeg - 2)]['length']*0.00621371*INCREASE_LENGTH + EPSILON_LENGTH
         current_range_soc = standard_soc_to_range_soc(current_standard_soc, soc_lower_bound)
         next_range_soc = write_data.nextSOC_real_data(current_range_soc, distance, 1, velocity, INSTALL)
         next_standard_soc = range_soc_to_standard_soc(next_range_soc, nLayers, soc_lower_bound)     
@@ -274,7 +275,8 @@ def write_data_to_file(filename, graph, data, data_var):
   myFile.close()
   
 def write_route_to_file(path,write):
-  myFile = open('temp_files/routes.txt', write)
+  routefile = curr_dir + 'temp_files/routes_' + str(seed) + '.txt'
+  myFile = open(routefile, write)
   
   out = [str(i) for i in path]
   out = " ".join(out)
@@ -418,16 +420,7 @@ def no_install_final_soc(graph, path):
   return current_range_soc
 
 
-def no_install_final_soc2(graph, path):
-  current_range_soc = 1
-  
-  #INSTALL = False
-  for roadSeg in path:
-    INSTALL = True
-    velocity = graph.node[roadSeg]['speed_urban']
-    distance = graph.node[roadSeg]['length']*0.00621371 # real soc no decrease or increase speed or distance
-    current_range_soc = write_data.nextSOC_real_data(current_range_soc, distance, 1, velocity, INSTALL)
-  return current_range_soc
+
         
 def main_shortest_paths():
   random.seed(seed)
@@ -458,7 +451,7 @@ total_distance = 88331.98102505456
   #budget = 10*1608 # in thousand dollars
   #budget = 10 * 3
   largeNumber = 20**10
-  filename = 'temp_files/mydata.dat'
+  filename = 'temp_files/mydata_' + str(seed) + '.dat'
   #soc_lower_bound = 0.8
   nnodes = nx.number_of_nodes(roadSegGraph)
   pathNumber = 1
@@ -543,7 +536,7 @@ def experiments(seed):
     #budget = 10*1608 # in thousand dollars
     #budget = 10 * 3
     largeNumber = 20**10
-    filename = 'temp_files/mydata.dat'
+    filename = curr_dir + 'temp_files/mydata_' + str(seed) + '.dat'
     #soc_lower_bound = 0.8
     nnodes = nx.number_of_nodes(roadSegGraph)
     pathNumber = 1
@@ -582,16 +575,23 @@ def get_path_length(graph, path):
 
 
 def base_routes_to_file(Routes):
-    myfile = open('temp_files/base_routes.txt', 'w')
+    baseroutesFile = curr_dir + 'temp_files/base_routes_' + str(seed) + '.txt'
+    myfile = open(baseroutesFile, 'w')
     for pair in Routes:
         path = " ".join(Routes[pair])
         path += '\n'
         myfile.write(path)
     myfile.close()
-            
+
+
+def comp_routes(path1, path2):
+    A = set(path1)
+    B = set(path2)
+    return len(A & B) / float(len(A | B))
+    
 def extra_paths():
     random.seed(seed)
-    
+    path_threshold = 0.8
     #num_routes = 30
     extra_routes = num_routes
     total_routes = num_routes + extra_routes
@@ -599,7 +599,7 @@ def extra_paths():
     #budget = 10*1608 # in thousand dollars
     #budget = 20 * 3
     largeNumber = 20**10
-    filename = 'temp_files/mydata.dat'
+    filename = curr_dir + 'temp_files/mydata_' + str(seed) + '.dat'
     nnodes = nx.number_of_nodes(roadSegGraph)
     pathNumber = 1
     data, data_var = init_dataFile(nLayers, budget, total_routes, largeNumber,soc_lower_bound)
@@ -637,7 +637,10 @@ def extra_paths():
         #length = get_path_length(roadSegGraph, Routes[(source, target)])
         path_gen = nx.shortest_simple_paths(roadSegGraph, source, target, weight = 'time')
         for path in path_gen:
-            if path != Routes[(source, target)]:
+            #if path != Routes[(source, target)]:
+            path_comp = comp_routes(path, Routes[(source, target)])
+            #print 'path comp', path_comp
+            if path_comp <= path_threshold:
                 print pathNumber
                 path  = [int(v) + 2 for v in path] 
                 path.append(1)
@@ -673,17 +676,33 @@ def average_final_soc(graph, myroutes, install_nodes_set):
 def no_install_avg_final_soc(graph, myroutes):
     total_soc = 0
     for s, t in myroutes:
-        total_soc += no_install_final_soc2(graph, myroutes[(s,t)])
+        total_soc += no_install_final_soc(graph, myroutes[(s,t)])
     return total_soc/float(len(myroutes))
 
-roadSegGraph = nx.read_graphml("graph_data/manhattan_neigborhood.graphml")
+def average_soc_infeasible_routes(graph, myroutes, install_nodes_set):
+    inf_soc = 0
+    ninfeasible = 0
+    for s, t in myroutes:
+        soc = final_soc(graph, myroutes[(s,t)], install_nodes_set)
+        if soc < soc_lower_bound:
+            inf_soc += soc
+            ninfeasible += 1.0    
+    if ninfeasible:
+        return len(myroutes) - int(ninfeasible), inf_soc/ninfeasible
+    else:
+        return len(myroutes), 1
+
+
+
+
+roadSegGraph = nx.read_graphml(curr_dir + "graph_data/manhattan_neigborhood.graphml")
 modify_graph_weights(roadSegGraph)
 soc_lower_bound = 0.8
-seed = 0
-random.seed(seed)
-num_routes = 3
-nLayers = 25
-budget = 100 * 3 * INCREASE_LENGTH
+#seed = 0
+#random.seed(seed)
+num_routes = 30
+nLayers = 23
+budget = 35 * 3 * INCREASE_LENGTH
 
 if __name__ == "__main__":
     #main_shortest_paths()

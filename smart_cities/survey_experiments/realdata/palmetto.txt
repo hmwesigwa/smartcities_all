@@ -1,0 +1,11 @@
+#!/bin/bash      
+#PBS -N example      
+#PBS -l select=1:ncpus=16:mem=60gb:interconnect=1g,walltime=72:00:00  
+#PBS -j oe      
+
+source /etc/profile.d/modules.sh  
+module purge   
+cd /home/hushiji/Research/smart_cities/smart_cities/survey_experiments/realdata
+
+
+python solve_model.py 31978
